@@ -31,18 +31,38 @@ jobs:
             rm "$ZIP_FILE"
           fi
 
+      - name: Generate Encoded README
+        run: |
+          # এখানে আপনার তথ্যগুলো Base64 এ আছে
+          # NAME: "Your Name" -> WW91ciBOYW1l
+          # IMAGE_URL: "https://example.com/pic.jpg" -> aHR0cHM6Ly9leGFtcGxlLmNvbS9waWMuanBn
+          # LINK1: "https://facebook.com" -> aHR0cHM6Ly9mYWNlYm9vay5jb20=
+          # LINK2: "https://github.com" -> aHR0cHM6Ly9naXRodWIuY29t
+          
+          NAME=$(echo "WW91ciBOYW1l" | base64 --decode)
+          IMG=$(echo "aHR0cHM6Ly9leGFtcGxlLmNvbS9waWMuanBn" | base64 --decode)
+          L1=$(echo "aHR0cHM6Ly9mYWNlYm9vay5jb20=" | base64 --decode)
+          L2=$(echo "aHR0cHM6Ly9naXRodWIuY29t" | base64 --decode)
+
+          echo "<div align='center'>" > README.md
+          echo "<img src='$IMG' width='150' style='border-radius: 50%;'>" >> README.md
+          echo "<h1>$NAME</h1>" >> README.md
+          echo "<a href='$L1'><img src='https://img.shields.io/badge/Facebook-1877F2?style=for-the-badge&logo=facebook&logoColor=white'></a>" >> README.md
+          echo "<a href='$L2'><img src='https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white'></a>" >> README.md
+          echo "</div>" >> README.md
+
       - name: Force Fix Vite Config
         run: |
           node -e "
           const fs = require('fs');
-          const filePath = fs.readdirSync('.').find(f => f.startsWith('vite.config.'));
+          const files = fs.readdirSync('.');
+          const filePath = files.find(f => f.startsWith('vite.config.'));
           if (filePath) {
             let content = fs.readFileSync(filePath, 'utf8');
             if (!content.includes('base:')) {
-              // এটি রিটার্ন অবজেক্টের শুরুতে base: './' ঢুকিয়ে দিবে
               content = content.replace(/return\s*\{/, \"return {\n      base: './',\");
               fs.writeFileSync(filePath, content);
-              console.log('Successfully fixed base path in ' + filePath);
+              console.log('Fixed base path in ' + filePath);
             }
           }
           "
@@ -52,13 +72,14 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          # শুধুমাত্র পরিবর্তন থাকলেই কমিক করবে
-          git diff --quiet && git diff --staged --quiet || (git commit -m "fix: added base path for github pages" && git push origin main)
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: auto-unzip and config update" && git push origin main)
 
       - name: Install and Build
         run: |
           npm install
           npm run build
+          # README ফাইলটি dist ফোল্ডারে কপি করা হচ্ছে যেন gh-pages এ দেখা যায়
+          cp README.md dist/ 
           touch dist/.nojekyll
 
       - name: Deploy to GitHub Pages
