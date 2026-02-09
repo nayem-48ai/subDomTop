@@ -1,4 +1,4 @@
-name: Final Fix - Preview and Deploy (No Password)
+name: Final Fix - Preview and Deploy
 
 on:
   push:
@@ -25,7 +25,7 @@ jobs:
 
       - name: Extract Zip
         run: |
-          ZIP_FILE=$(ls *.zip | head -n 1)
+          ZIP_FILE=$(ls *.zip 2>/dev/null | head -n 1) || true
           if [ -f "$ZIP_FILE" ]; then
             unzip -o "$ZIP_FILE" -d .
             rm "$ZIP_FILE"
@@ -56,28 +56,37 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git diff --quiet && git diff --staged --quiet || (git commit -m "fix: prepare for cloudflare preview" && git push origin main)
+          git diff --quiet && git diff --staged --quiet || (git commit -m "fix: prepare preview" && git push origin main)
 
       - name: Install Dependencies
         run: npm install
 
-      - name: Live Dev Preview (Cloudflare - No Password)
+      - name: Live Dev Preview (Easy Link)
         run: |
-          # Cloudflared ইনস্টল করা
+          # Cloudflared ইনস্টল
           curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
           sudo dpkg -i cloudflared.deb
           
-          echo "------------------------------------------------------------"
-          echo "🌐 CLOUDFLARE PREVIEW LINK BELOW (NO PASSWORD NEEDED)"
-          echo "------------------------------------------------------------"
-
-          # Vite সার্ভার রান করা
+          # Vite রান করা
           npm run dev -- --host 0.0.0.0 --port 3000 & 
           
-          sleep 15
+          sleep 10
           
-          # ক্লাউডফ্লেয়ার টানেল চালু করা (১০ মিনিট)
-          timeout 10m cloudflared tunnel --url http://localhost:3000 || true
+          echo "------------------------------------------------------------"
+          echo "🔍 SEARCHING 4 PREVIEW LINK..."
+          
+          # টানেল চালু করে শুধু লিঙ্কটি ফিল্টার করে দেখানো
+          timeout 10m cloudflared tunnel --url http://localhost:3000 2>&1 | tee /tmp/cf.log | grep -oE "https://[a-zA-Z0-9.-]+\.trycloudflare\.com" &
+          
+          # লিঙ্ক জেনারেট হতে একটু সময় লাগে
+          sleep 8
+          echo ""
+          echo "🚀 YOUR PREVIEW LINK:"
+          grep -oE "https://[a-zA-Z0-9.-]+\.trycloudflare\.com" /tmp/cf.log | head -n 1
+          echo "------------------------------------------------------------"
+          
+          # ১০ মিনিট ওয়েট করবে যাতে আপনি কাজ করতে পারেন
+          sleep 10m || true
 
       - name: Final Build and Deploy
         run: |
