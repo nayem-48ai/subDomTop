@@ -1,13 +1,16 @@
-name: Build React Project from Zip
+name: Unzip and Build Project
 
 on:
   push:
     branches:
-      - main  # আপনার মেইন ব্রাঞ্চের নাম দিন
+      - main
+  workflow_dispatch: # এটি দিলে আপনি নিজে বাটন চেপেও রান করতে পারবেন
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # ফাইল পুশ করার পারমিশন
 
     steps:
       - name: Checkout code
@@ -18,24 +21,31 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Extract tnxbd-multi-tenant-saas Zip
+      - name: Extract Project Zip
         run: |
-          # ধরুন আপনার জিপ ফাইলের নাম tnxbd-multi-tenant-saas.zip
-          if [ -f "tnxbd-multi-tenant-saas.zip" ]; then
-            unzip -o tnxbd-multi-tenant-saas.zip -d .
+          # আপনার ফাইলের নাম অনুযায়ী ঠিক করা হয়েছে
+          if [ -f "Tnxbd-multi-tenant-saas.zip" ]; then
+            unzip -o Tnxbd-multi-tenant-saas.zip -d .
+            rm Tnxbd-multi-tenant-saas.zip # ক্লিন রাখার জন্য জিপ ডিলিট করা হলো
           else
             echo "Zip file not found!"
             exit 1
           fi
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install and Build
+        run: |
+          if [ -f "package.json" ]; then
+            npm install
+            npm run build
+          else
+            echo "package.json not found in root!"
+            exit 1
+          fi
 
-      - name: Build project
-        run: npm run build
-
-      - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: production-files
-          path: build/  # React এর ডিফল্ট বিল্ড ফোল্ডার
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Auto-unzip and build from zip" || echo "No changes to commit"
+          git push
