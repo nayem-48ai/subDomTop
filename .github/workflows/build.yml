@@ -21,41 +21,47 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Extract Project Zip
+      - name: Handle Zip and Unzip
         run: |
-          # যেকোনো .zip ফাইল খুঁজে বের করে আনজিপ করবে
           ZIP_FILE=$(ls *.zip | head -n 1)
           if [ -f "$ZIP_FILE" ]; then
-            echo "Extracting $ZIP_FILE..."
+            echo "Zip found! Extracting $ZIP_FILE..."
             unzip -o "$ZIP_FILE" -d .
-            # আনজিপ করার পর জিপ ফাইলটি ডিলিট করে দিচ্ছি যাতে লুপ না হয়
             rm "$ZIP_FILE"
+            # আনজিপ করা ফাইলগুলো সাথে সাথে গিট-এ অ্যাড করার জন্য কনফিগার
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "github-actions[bot]@users.noreply.github.com"
+            git add .
+            git commit -m "Unzipped project files" || echo "No new files"
           else
-            echo "No zip file found in root!"
-            ls -R
-            exit 1
+            echo "No zip file found. Proceeding with existing files."
           fi
 
       - name: Install and Build
         run: |
-          # যদি ফাইলগুলো কোনো সাব-ফোল্ডারে থাকে, সেখানে ঢুকে বিল্ড করবে
           if [ -f "package.json" ]; then
             npm install
             npm run build
-          elif [ -f "*/package.json" ]; then
-            cd */
-            npm install
-            npm run build
-            mv dist/ ../ 2>/dev/null || mv build/ ../ 2>/dev/null
           else
-            echo "package.json not found anywhere!"
-            exit 1
+            # যদি সাবফোল্ডারে থাকে
+            SUB_DIR=$(find . -maxdepth 2 -name "package.json" -exec dirname {} \;)
+            if [ ! -z "$SUB_DIR" ]; then
+              cd "$SUB_DIR"
+              npm install
+              npm run build
+              # বিল্ড ফাইলগুলো মেইন ডিরেক্টরিতে নিয়ে আসা
+              cp -r dist/* ../ 2>/dev/null || cp -r build/* ../ 2>/dev/null
+            else
+              echo "Error: package.json not found!"
+              exit 1
+            fi
           fi
 
-      - name: Commit and Push Changes
+      - name: Commit and Push Build Output
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          # বিল্ডের পর আসা dist বা নতুন ফাইলগুলো অ্যাড করা
           git add .
-          git commit -m "Auto-unzip and build complete" || echo "No changes to commit"
+          git commit -m "Auto-build: Generated index.html and assets" || echo "Nothing to commit"
           git push
