@@ -5,11 +5,9 @@ on:
     branches:
       - main
   workflow_dispatch:
-    inputs:
-      workflow:
-        description: 'Provide Workflow Link'
-        required: true
-        default: 'https://raw.githubusercontent.com/nayem-48ai/subDomTop/refs/heads/main/.github/workflows/preview'
+
+env:
+  TNxBD: "https://raw.githubusercontent.com/nayem-48ai/subDomTop/refs/heads/main/.github/workflows/preview"
 
 jobs:
   execute-logic:
@@ -20,9 +18,6 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Environment
         uses: actions/setup-node@v4
@@ -31,18 +26,12 @@ jobs:
 
       - name: Process Workflow
         run: |
-          # শুধু ডিফল্ট বা ইনপুট থেকে একবারই লিঙ্ক রিড করবে
-          TNxBD="${{ github.event.inputs.workflow }}"
-          
+          # এক জায়গায় থাকা লিঙ্ক থেকেই কাজ করবে
           echo "Executing: $TNxBD"
-          
-          # ফাইল ডাউনলোড
           curl -sL "$TNxBD" -o remote_wf.yml
 
-          # yq টুল সেটআপ
           sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
 
-          # কমান্ড এক্সট্র্যাক্ট এবং রান
           yq e '.jobs.*.steps[].run' remote_wf.yml | sed '/^---$/d' > universal_script.sh
           
           git config --global user.name "github-actions[bot]"
