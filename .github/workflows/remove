@@ -1,4 +1,4 @@
-name: Flexible Repository Cleanup
+name: Pro Repository Cleanup
 
 on:
   push:
@@ -15,25 +15,35 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Delete Files and Folders with Exclusions
+      - name: Delete Files and Folders (Main Branch)
         run: |
-          echo "Starting selective cleanup..."
+          echo "Cleaning up files..."
           
-          # 'find' কমান্ড দিয়ে ফাইল/ফোল্ডার ফিল্টার করা হচ্ছে।
-          # ! -name 'নাম' মানে হলো এই ফাইল বা ফোল্ডারটি ডিলেট হবে না।
+          # যেসব ফাইল বা ফোল্ডার বাদ দিতে চান তাদের নাম এখানে লিখুন (পাইপ | দিয়ে আলাদা করুন)
+          # ডিফল্টভাবে .github, .git এবং . বাদ রাখা হয়েছে
+          SAFE_FILES=".github|.git|."
           
-          find . -maxdepth 1 \
-            ! -name '.github' \
-            ! -name '.git' \
-            ! -name '.' \
-            -exec rm -rf {} +
+          # লুপ চালিয়ে ফাইল চেক করা এবং ডিলিট করা
+          for item in $(ls -A); do
+            if [[ ! "$item" =~ ^($SAFE_FILES)$ ]]; then
+              rm -rf "$item"
+            fi
+          done
 
-          # 💡 আপনি যদি আরও কিছু বাদ দিতে চান (যেমন: images ফোল্ডার), 
-          # তবে উপরে ! -name 'images' \ লাইনটি যোগ করুন।
-          # মনে রাখবেন, শেষ লাইনের আগে অবশ্যই একটি ব্যাকস্ল্যাশ (\) থাকতে হবে।
+          echo "File cleanup finished!"
 
-          echo "Cleanup finished successfully!"
+      - name: Delete Remote Branches
+        run: |
+          echo "Cleaning up branches..."
+          
+          # যেসব ব্রাঞ্চ ডিলিট করতে চান না তাদের নাম এখানে লিখুন (পাইপ | দিয়ে আলাদা করুন)
+          SAFE_BRANCHES="main" 
+
+          # রিমোট ব্রাঞ্চগুলো চেক করে ডিলিট করা
+          git branch -r | grep -vE "$SAFE_BRANCHES" | sed 's/origin\///' | xargs -I {} git push origin --delete {} || echo "No extra branches to delete."
 
       - name: Save and Push Changes
         run: |
@@ -41,10 +51,9 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
           git add -A
-          
           if git diff --quiet && git diff --staged --quiet; then
-            echo "Nothing to commit, repository is already clean."
+            echo "No changes to commit."
           else
-            git commit -m "chore: cleanup repository (preserved workflows and specific files)"
+            git commit -m "chore: automated deep cleanup"
             git push origin main
           fi
