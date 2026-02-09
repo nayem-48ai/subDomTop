@@ -1,4 +1,4 @@
-name: Unzip, Build and Deploy
+name: Unzip, Auto-Fix Config, Build and Deploy
 
 on:
   push:
@@ -29,6 +29,19 @@ jobs:
             rm "$ZIP_FILE"
           fi
 
+      - name: Auto-Fix Vite Config (Base Path)
+        run: |
+          CONFIG_FILE=$(ls vite.config.* | head -n 1)
+          if [ -f "$CONFIG_FILE" ]; then
+            if ! grep -q "base:" "$CONFIG_FILE"; then
+              echo "Base path missing. Adding base: './' to $CONFIG_FILE"
+              # defineConfig এর ঠিক পরে base: './' ইনসার্ট করার চেষ্টা করবে
+              sed -i "s/defineConfig({/defineConfig({\n      base: '.\/',/" "$CONFIG_FILE"
+            else
+              echo "Base path already exists in $CONFIG_FILE"
+            fi
+          fi
+
       - name: Install and Build
         run: |
           # .gitignore থেকে dist বাদ দেওয়া যেন গিট এটি রিড করতে পারে
@@ -42,5 +55,6 @@ jobs:
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist # আপনার বিল্ড করা dist ফোল্ডারটি পাবলিশ হবে
-          publish_branch: gh-pages # এই নামে নতুন ব্রাঞ্চ তৈরি হবে
+          publish_dir: ./dist
+          publish_branch: gh-pages # ব্রাঞ্চ থাকলে আপডেট করবে, না থাকলে তৈরি করবে
+          force_orphan: false # এটি ট্রু থাকলে হিস্ট্রি ডিলিট হয়, ফলস থাকলে আপডেট হয়
