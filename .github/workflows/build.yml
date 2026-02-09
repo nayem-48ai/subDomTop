@@ -1,4 +1,4 @@
-name: Final Fix - Preview and Deploy
+name: Tnayem48 Preview Engine
 
 on:
   push:
@@ -7,13 +7,13 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-preview:
+  preview-engine:
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -23,7 +23,7 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Extract Zip
+      - name: Extract Project
         run: |
           ZIP_FILE=$(ls *.zip 2>/dev/null | head -n 1) || true
           if [ -f "$ZIP_FILE" ]; then
@@ -31,7 +31,7 @@ jobs:
             rm "$ZIP_FILE"
           fi
 
-      - name: Robust Vite Config Fix
+      - name: Patch Vite Config
         run: |
           node -e "
           const fs = require('fs');
@@ -41,7 +41,7 @@ jobs:
             if (!content.includes('base:')) {
               content = content.replace(/return\s*\{/, \"return {\n      base: './',\");
             }
-            const serverConfig = \"server: { host: '0.0.0.0', port: 3000, allowedHosts: true },\";
+            const serverConfig = \"server: { host: '0.0.0.0', allowedHosts: true },\";
             if (content.includes('server:')) {
               content = content.replace(/server\s*:\s*\{[\s\S]*?\},/, serverConfig);
             } else {
@@ -51,36 +51,42 @@ jobs:
           }
           "
 
-      - name: Save Changes to Main Branch
+      - name: Sync Repository
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git diff --quiet && git diff --staged --quiet || (git commit -m "fix: prepare preview" && git push origin main)
+          git diff --quiet && git diff --staged --quiet || (git commit -m "fix: preview sync" && git push origin main)
 
-      - name: Install Dependencies
+      - name: Install Packages
         run: npm install
 
       - name: Live Dev Preview (@Tnayem48)
         run: |
-          # Cloudflared ইনস্টল
+          PORT=$(node -e "
+            const fs = require('fs');
+            try {
+              const file = fs.readdirSync('.').find(f => f.startsWith('vite.config.'));
+              const content = fs.readFileSync(file, 'utf8');
+              const match = content.match(/port\s*:\s*(\d+)/);
+              console.log(match ? match[1] : 3000);
+            } catch (e) { console.log(3000); }
+          ")
+
           curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
           sudo dpkg -i cloudflared.deb
           
-          # Vite রান করা
-          npm run dev -- --host 0.0.0.0 --port 3000 & 
+          npm run dev -- --host 0.0.0.0 --port $PORT & 
           
           sleep 10
           
           echo "------------------------------------------------------------"
           echo "🔍 SEARCHING FOR PREVIEW LINK..."
-          echo "⚠️  লিঙ্কটি চালু হতে ১০-১৫ সেকেন্ড সময় নিতে পারে, অনুগ্রহ করে অপেক্ষা করুন।"
+          echo "⚠️  লিঙ্কটি চালু হতে ১০-১৫ সেকেন্ড সময় নিতে পারে।"
           
-          # টানেল চালু করে শুধু লিঙ্কটি ফিল্টার করে দেখানো
-          timeout 10m cloudflared tunnel --url http://localhost:3000 2>&1 | tee /tmp/cf.log | grep -oE "https://[a-zA-Z0-9.-]+\.trycloudflare\.com" &
+          timeout 10m cloudflared tunnel --url http://localhost:$PORT 2>&1 | tee /tmp/cf.log | grep -oE "https://[a-zA-Z0-9.-]+\.trycloudflare\.com" &
           
-          # লিঙ্ক জেনারেট হতে একটু সময় লাগে
-          sleep 10
+          sleep 12
           echo ""
           echo "🚀 YOUR PREVIEW LINK:"
           grep -oE "https://[a-zA-Z0-9.-]+\.trycloudflare\.com" /tmp/cf.log | head -n 1
@@ -88,18 +94,4 @@ jobs:
           echo "Copyright © Tnayem48"
           echo "------------------------------------------------------------"
           
-          # ১০ মিনিট ওয়েট করবে যাতে আপনি কাজ করতে পারেন
           sleep 10m || true
-
-      - name: Final Build and Deploy
-        run: |
-          npm run build
-          touch dist/.nojekyll
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          publish_branch: gh-pages
-          force_orphan: true
