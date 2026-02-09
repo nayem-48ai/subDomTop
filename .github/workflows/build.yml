@@ -56,7 +56,7 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Live Dev Preview (5 Minutes)
+      - name: Live Dev Preview (No Password)
         run: |
           # উন্নত পোর্ট সার্চ লজিক
           PORT=$(node -e "
@@ -65,32 +65,28 @@ jobs:
               const file = fs.readdirSync('.').find(f => f.startsWith('vite.config.'));
               if (file) {
                 const content = fs.readFileSync(file, 'utf8');
-                // port: 3000 বা port:3000 ফরম্যাট খুঁজবে
                 const match = content.match(/port\s*:\s*(\d+)/);
-                if (match) {
-                  console.log(match[1]);
-                  process.exit(0);
-                }
+                if (match) { console.log(match[1]); process.exit(0); }
               }
             } catch (e) {}
-            // কিছু না পেলে ডিফল্ট ৩০০০
             console.log(3000);
           ")
           
           echo "Using Port: $PORT"
-          npm install -g localtunnel
           
           # Dev সার্ভার ব্যাকগ্রাউন্ডে রান করা
           npm run dev -- --host & 
           
-          # সার্ভার চালু হওয়ার জন্য একটু বেশি সময় দেয়া
-          sleep 15
+          # সার্ভার চালু হওয়ার জন্য সময়
+          sleep 10
           
           echo "------------------------------------------------------------"
-          echo "গিটহাব অ্যাকশন লগের নিচে এই লিঙ্কে ক্লিক করুন প্রিভিউ দেখতে:"
-          # ১০ মিনিট প্রিভিউ সেশন চালু থাকবে
-          timeout 10m lt --port $PORT || true
+          echo "লিঙ্কটি জেনারেট হচ্ছে, নিচের 'Forwarding' লিঙ্কটিতে ক্লিক করুন:"
           echo "------------------------------------------------------------"
+          
+          # Serveo ব্যবহার করে টানেলিং (পাসওয়ার্ড লাগে না)
+          # এটি ১০ মিনিট চালু থাকবে
+          timeout 10m ssh -o StrictHostKeyChecking=no -R 80:localhost:$PORT serveo.net || true
 
       - name: Final Build and Deploy
         run: |
