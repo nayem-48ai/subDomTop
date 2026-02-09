@@ -1,0 +1,50 @@
+name: Flexible Repository Cleanup
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Delete Files and Folders with Exclusions
+        run: |
+          echo "Starting selective cleanup..."
+          
+          # 'find' কমান্ড দিয়ে ফাইল/ফোল্ডার ফিল্টার করা হচ্ছে।
+          # ! -name 'নাম' মানে হলো এই ফাইল বা ফোল্ডারটি ডিলেট হবে না।
+          
+          find . -maxdepth 1 \
+            ! -name '.github' \
+            ! -name '.git' \
+            ! -name '.' \
+            -exec rm -rf {} +
+
+          # 💡 আপনি যদি আরও কিছু বাদ দিতে চান (যেমন: images ফোল্ডার), 
+          # তবে উপরে ! -name 'images' \ লাইনটি যোগ করুন।
+          # মনে রাখবেন, শেষ লাইনের আগে অবশ্যই একটি ব্যাকস্ল্যাশ (\) থাকতে হবে।
+
+          echo "Cleanup finished successfully!"
+
+      - name: Save and Push Changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add -A
+          
+          if git diff --quiet && git diff --staged --quiet; then
+            echo "Nothing to commit, repository is already clean."
+          else
+            git commit -m "chore: cleanup repository (preserved workflows and specific files)"
+            git push origin main
+          fi
