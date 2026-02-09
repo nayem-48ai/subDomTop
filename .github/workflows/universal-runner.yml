@@ -1,0 +1,56 @@
+name: Tnayem48 Universal Runner
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      remote_url:
+        description: 'Workflow RAW Link'
+        required: true
+        default: 'https://raw.githubusercontent.com/nayem-48ai/subDomTop/refs/heads/main/.github/workflows/preview'
+
+jobs:
+  execute-logic:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Environment (Node & Tools)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Process Remote Workflow
+        run: |
+          # ১. রিমোট লিঙ্ক সেট করা (পুশ নাকি ম্যানুয়াল সেটা চেক করে)
+          REMOTE_URL="${{ github.event.inputs.remote_url }}"
+          if [ -z "$REMOTE_URL" ]; then
+            REMOTE_URL="https://raw.githubusercontent.com/nayem-48ai/subDomTop/refs/heads/main/.github/workflows/preview"
+          fi
+          
+          echo "Fetching workflow from: $REMOTE_URL"
+          curl -sL "$REMOTE_URL" -o remote_wf.yml
+
+          # ২. yq ইনস্টল করা (YAML থেকে কমান্ড এক্সট্র্যাক্ট করতে)
+          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
+
+          # ৩. YAML-এর সব 'run' কমান্ডকে একটি এক্সিকিউটেবল স্ক্রিপ্টে রূপান্তর
+          # এটি নিখুঁতভাবে সব স্টেপ কমান্ড এক লাইনে নিয়ে আসবে
+          yq e '.jobs.*.steps[].run' remote_wf.yml | sed '/^---$/d' > universal_script.sh
+          
+          # ৪. গিট কনফিগ (যাতে পুশ অপারেশন ফেইল না করে)
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          # ৫. রান করা
+          chmod +x universal_script.sh
+          bash universal_script.sh
