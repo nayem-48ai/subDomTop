@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -29,7 +31,7 @@ jobs:
             rm "$ZIP_FILE"
           fi
 
-      - name: Auto-Fix Vite Config (Safe Method)
+      - name: Auto-Fix Vite Config
         run: |
           node -e "
           const fs = require('fs');
@@ -37,19 +39,22 @@ jobs:
           if (files.length > 0) {
             let content = fs.readFileSync(files[0], 'utf8');
             if (!content.includes('base:')) {
-              // defineConfig এর ভেতরে base পাথ ঢুকিয়ে দিচ্ছে
+              // defineConfig এর ভেতর base: './' ইনজেক্ট করা হচ্ছে
               content = content.replace(/defineConfig\(\{/, \"defineConfig({\n  base: './',\");
               fs.writeFileSync(files[0], content);
               console.log('Fixed base path in ' + files[0]);
-            } else {
-              console.log('Base path already exists.');
             }
           }
           "
+          # পরিবর্তনগুলো Main Branch-এ সেভ করা
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "chore: auto-fix vite config and unzip files" || echo "No changes to commit"
+          git push origin main
 
       - name: Install and Build
         run: |
-          sed -i '/dist/d' .gitignore || true
           npm install
           npm run build
           touch dist/.nojekyll
@@ -60,6 +65,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
           publish_branch: gh-pages
-          force_orphan: false # ব্রাঞ্চ ডিলিট না করে আপডেট করবে
-          user_name: 'github-actions[bot]'
-          user_email: 'github-actions[bot]@users.noreply.github.com'
+          force_orphan: true # এটি দিলে পুরনো ফাইল মুছে নতুন করে ব্রাঞ্চ তৈরি হবে, যা আপনার সমস্যার সমাধান করবে
