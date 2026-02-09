@@ -1,0 +1,51 @@
+name: Extract Zip and Update Main
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  unzip-and-update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Find and Extract Zip
+        run: |
+          # যেকোনো নামের প্রথম জিপ ফাইলটি খুঁজে বের করা
+          ZIP_FILE=$(ls *.zip | head -n 1)
+          
+          if [ -f "$ZIP_FILE" ]; then
+            echo "Extracting $ZIP_FILE..."
+            # -o দিয়ে আগের সব ফাইল রিপ্লেস করা হবে
+            unzip -o "$ZIP_FILE" -d .
+            
+            echo "Deleting $ZIP_FILE..."
+            rm "$ZIP_FILE"
+          else
+            echo "No zip file found in root directory."
+            exit 0
+          fi
+
+      - name: Save and Push Changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add .
+          
+          # যদি কোনো পরিবর্তন থাকে তবেই কমিট করবে
+          if git diff --quiet && git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "chore: extract project files and update repository"
+            git push origin main
+          fi
