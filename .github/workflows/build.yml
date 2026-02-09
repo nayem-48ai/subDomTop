@@ -63,36 +63,35 @@ jobs:
 
       - name: Live Dev Preview @Tnayem48
         run: |
-          # Cloudflared ইন্সটল
-          curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-          sudo dpkg -i cloudflared.deb
+          # Cloudflared ইন্সটল (লগ অফ রেখে)
+          curl -L -s --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared.deb > /dev/null 2>&1
           
-          # Vite রান করা
-          npm run dev -- --host 0.0.0.0 --port 3000 & 
+          # Vite রান করা (শান্তভাবে)
+          npm run dev -- --host 0.0.0.0 --port 3000 > /dev/null 2>&1 & 
           
-          sleep 10
+          # টানেল চালু করা এবং সব জঞ্জাল আউটপুট ব্লক করা
+          cloudflared tunnel --url http://localhost:3000 > /tmp/cf.log 2>&1 &
           
-          # টানেল চালু করা এবং লগে লিঙ্ক সেভ করা
-          timeout 10m cloudflared tunnel --url http://localhost:3000 2>&1 | tee /tmp/cf.log &
+          echo "Waiting for link generation..."
+          sleep 15
           
-          # লিঙ্ক জেনারেট হওয়া পর্যন্ত অপেক্ষা
-          sleep 10
-          
-          # লিঙ্কটি ফিল্টার করে বের করা
+          # লিঙ্ক বের করা
           CF_URL=$(grep -oE "https://[a-zA-Z0-9.-]+\.trycloudflare\.com" /tmp/cf.log | head -n 1)
           
-          # GitHub Step Summary-তে বড় এবং সুন্দর লিঙ্ক পাঠানো
-          echo "### 🚀 Preview is Ready!" >> $GITHUB_STEP_SUMMARY
-          echo "Your dev server is live at:" >> $GITHUB_STEP_SUMMARY
-          echo "## [👉 Click Here to Open Preview]($CF_URL)" >> $GITHUB_STEP_SUMMARY
-          echo "---" >> $GITHUB_STEP_SUMMARY
-          echo "User: @Tnayem48" >> $GITHUB_STEP_SUMMARY
+          # লগে একদম ক্লিন ভাবে দেখানো
+          echo ""
+          echo "=========================================================="
+          echo "🚀 LIVE PREVIEW READY @Tnayem48"
+          echo "🔗 URL: $CF_URL"
+          echo "=========================================================="
+          echo ""
           
-          echo "------------------------------------------------------------"
-          echo "🚀 PREVIEW LINK: $CF_URL"
-          echo "------------------------------------------------------------"
-          
-          # ১০ মিনিট প্রিভিউ সেশন চালু রাখা
+          # GitHub Summary-তেও সুন্দর লিঙ্ক অ্যাড করা
+          echo "## 🚀 Preview Live @Tnayem48" >> $GITHUB_STEP_SUMMARY
+          echo "[👉 ওপেন করুন এখানে]($CF_URL)" >> $GITHUB_STEP_SUMMARY
+
+          # ১০ মিনিট সময় দিন চেক করার জন্য
           sleep 10m || true
 
       - name: Final Build and Deploy
