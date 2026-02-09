@@ -7,6 +7,7 @@ export default defineConfig(({ mode }) => {
     return {
       base: './',
       server: {
+        allowedHosts: 'all',
         port: 3000,
         host: '0.0.0.0',
       },
