@@ -1,0 +1,41 @@
+name: Build React Project from Zip
+
+on:
+  push:
+    branches:
+      - main  # আপনার মেইন ব্রাঞ্চের নাম দিন
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Extract tnxbd-multi-tenant-saas Zip
+        run: |
+          # ধরুন আপনার জিপ ফাইলের নাম tnxbd-multi-tenant-saas.zip
+          if [ -f "tnxbd-multi-tenant-saas.zip" ]; then
+            unzip -o tnxbd-multi-tenant-saas.zip -d .
+          else
+            echo "Zip file not found!"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build project
+        run: npm run build
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-files
+          path: build/  # React এর ডিফল্ট বিল্ড ফোল্ডার
