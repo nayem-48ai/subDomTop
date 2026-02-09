@@ -56,42 +56,41 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git diff --quiet && git diff --staged --quiet || (git commit -m "fix: sync changes" && git push origin main)
+          git diff --quiet && git diff --staged --quiet || (git commit -m "fix: prepare preview" && git push origin main)
 
       - name: Install Dependencies
         run: npm install
 
-      - name: Live Dev Preview @Tnayem48
+      - name: Live Dev Preview (@Tnayem48)
         run: |
-          # Cloudflared ইন্সটল (লগ অফ রেখে)
-          curl -L -s --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-          sudo dpkg -i cloudflared.deb > /dev/null 2>&1
+          # Cloudflared ইনস্টল
+          curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared.deb
           
-          # Vite রান করা (শান্তভাবে)
-          npm run dev -- --host 0.0.0.0 --port 3000 > /dev/null 2>&1 & 
+          # Vite রান করা
+          npm run dev -- --host 0.0.0.0 --port 3000 & 
           
-          # টানেল চালু করা এবং সব জঞ্জাল আউটপুট ব্লক করা
-          cloudflared tunnel --url http://localhost:3000 > /tmp/cf.log 2>&1 &
+          sleep 10
           
-          echo "Waiting for link generation..."
-          sleep 15
+          echo "------------------------------------------------------------"
+          echo "🔍 SEARCHING FOR PREVIEW LINK..."
           
-          # লিঙ্ক বের করা
-          CF_URL=$(grep -oE "https://[a-zA-Z0-9.-]+\.trycloudflare\.com" /tmp/cf.log | head -n 1)
+          # টানেল চালু করে শুধু লিঙ্কটি ফিল্টার করে দেখানো
+          timeout 10m cloudflared tunnel --url http://localhost:3000 2>&1 | tee /tmp/cf.log | grep -oE "https://[a-zA-Z0-9.-]+\.trycloudflare\.com" &
           
-          # লগে একদম ক্লিন ভাবে দেখানো
+          # লিঙ্ক জেনারেট হতে সময় লাগে
+          sleep 10
+          
           echo ""
-          echo "=========================================================="
-          echo "🚀 LIVE PREVIEW READY @Tnayem48"
-          echo "🔗 URL: $CF_URL"
-          echo "=========================================================="
+          echo "📢 নোট: লিঙ্কটি পাওয়ার পর ১০-১৫ সেকেন্ড অপেক্ষা করে ব্রাউজ করুন।"
           echo ""
+          echo "🚀 YOUR PREVIEW LINK:"
+          grep -oE "https://[a-zA-Z0-9.-]+\.trycloudflare\.com" /tmp/cf.log | head -n 1
+          echo ""
+          echo "© Copyright Tnayem48"
+          echo "------------------------------------------------------------"
           
-          # GitHub Summary-তেও সুন্দর লিঙ্ক অ্যাড করা
-          echo "## 🚀 Preview Live @Tnayem48" >> $GITHUB_STEP_SUMMARY
-          echo "[👉 ওপেন করুন এখানে]($CF_URL)" >> $GITHUB_STEP_SUMMARY
-
-          # ১০ মিনিট সময় দিন চেক করার জন্য
+          # ১০ মিনিট প্রিভিউ সেশন চালু থাকবে
           sleep 10m || true
 
       - name: Final Build and Deploy
