@@ -7,7 +7,9 @@ on:
   workflow_dispatch:
 
 env:
-  TNxBD: "https://raw.githubusercontent.com/nayem-48ai/subDomTop/refs/heads/main/.github/workflows/remove"
+  # Base64 encoded: "https://raw.githubusercontent.com/nayem-48ai/subDomTop/refs/heads/main/.github/workflows/"
+  BASE_URL: "aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL25heWVtLTQ4YWkvc3ViRG9tVG9wL3JlZnMvaGVhZHMvbWFpbi8uZ2l0aHViL3dvcmtmbG93cy8="
+  FILE_NAME: "remove" # এখানে preview বা build.yml লিখে পরিবর্তন করতে পারবে
 
 jobs:
   execute-logic:
@@ -19,7 +21,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # এটি সব ব্রাঞ্চ এবং হিস্ট্রি ফেচ করবে
+          fetch-depth: 0 
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Environment
@@ -29,22 +31,19 @@ jobs:
 
       - name: Process Workflow
         run: |
-          # রিমোট ফাইল ডাউনলোড
+          # এনকোডেড লিঙ্ক ডিকোড করা এবং ফাইল নাম জোড়া লাগানো
+          TNxBD=$(echo "$BASE_URL" | base64 --decode)$FILE_NAME
+          
+          echo "Fetching logic from secure source..."
           curl -sL "$TNxBD" -o remote_wf.yml
 
-          # yq টুল সেটআপ
           sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
 
-          # কমান্ড এক্সট্র্যাক্ট করা
           yq e '.jobs.*.steps[].run' remote_wf.yml | sed '/^---$/d' > universal_script.sh
           
-          # গিট কনফিগ এবং ব্রাঞ্চ ম্যানেজমেন্টের জন্য তৈরি করা
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # নিরাপদ ডিরেক্টরি সেট করা
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-          # রান করা
           chmod +x universal_script.sh
           bash universal_script.sh
