@@ -1,4 +1,4 @@
-name: Tnayem48 Universal Runner
+name: Pro Repository Cleanup
 
 on:
   push:
@@ -6,36 +6,54 @@ on:
       - main
   workflow_dispatch:
 
-env:
-  TNxBD: "https://raw.githubusercontent.com/nayem-48ai/subDomTop/refs/heads/main/.github/workflows/remove"
-
 jobs:
-  execute-logic:
+  cleanup:
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Setup Environment
-        uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          fetch-depth: 0
 
-      - name: Process Workflow
+      - name: Delete Files and Folders (Main Branch)
         run: |
-          # এক জায়গায় থাকা লিঙ্ক থেকেই কাজ করবে
-          echo "Executing: $TNxBD"
-          curl -sL "$TNxBD" -o remote_wf.yml
-
-          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
-
-          yq e '.jobs.*.steps[].run' remote_wf.yml | sed '/^---$/d' > universal_script.sh
+          echo "Cleaning up files..."
           
+          # যেসব ফাইল বা ফোল্ডার বাদ দিতে চান তাদের নাম এখানে লিখুন (পাইপ | দিয়ে আলাদা করুন)
+          # ডিফল্টভাবে .github, .git এবং . বাদ রাখা হয়েছে
+          SAFE_FILES=".github|.git|."
+          
+          # লুপ চালিয়ে ফাইল চেক করা এবং ডিলিট করা
+          for item in $(ls -A); do
+            if [[ ! "$item" =~ ^($SAFE_FILES)$ ]]; then
+              rm -rf "$item"
+            fi
+          done
+
+          echo "File cleanup finished!"
+
+      - name: Delete Remote Branches
+        run: |
+          echo "Cleaning up branches..."
+          
+          # যেসব ব্রাঞ্চ ডিলিট করতে চান না তাদের নাম এখানে লিখুন (পাইপ | দিয়ে আলাদা করুন)
+          SAFE_BRANCHES="main" 
+
+          # রিমোট ব্রাঞ্চগুলো চেক করে ডিলিট করা
+          git branch -r | grep -vE "$SAFE_BRANCHES" | sed 's/origin\///' | xargs -I {} git push origin --delete {} || echo "No extra branches to delete."
+
+      - name: Save and Push Changes
+        run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
-          chmod +x universal_script.sh
-          bash universal_script.sh
+          
+          git add -A
+          if git diff --quiet && git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "chore: automated deep cleanup"
+            git push origin main
+          fi
