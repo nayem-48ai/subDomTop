@@ -1,4 +1,4 @@
-name: Unzip, Fix Config, and Deploy
+name: Final Fix - Unzip, Config and Deploy
 
 on:
   push:
@@ -16,7 +16,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -31,27 +31,29 @@ jobs:
             rm "$ZIP_FILE"
           fi
 
-      - name: Auto-Fix Vite Config
+      - name: Force Fix Vite Config
         run: |
           node -e "
           const fs = require('fs');
-          const files = fs.readdirSync('.').filter(f => f.startsWith('vite.config.'));
-          if (files.length > 0) {
-            let content = fs.readFileSync(files[0], 'utf8');
+          const filePath = fs.readdirSync('.').find(f => f.startsWith('vite.config.'));
+          if (filePath) {
+            let content = fs.readFileSync(filePath, 'utf8');
             if (!content.includes('base:')) {
-              // defineConfig এর ভেতর base: './' ইনজেক্ট করা হচ্ছে
-              content = content.replace(/defineConfig\(\{/, \"defineConfig({\n  base: './',\");
-              fs.writeFileSync(files[0], content);
-              console.log('Fixed base path in ' + files[0]);
+              // এটি রিটার্ন অবজেক্টের শুরুতে base: './' ঢুকিয়ে দিবে
+              content = content.replace(/return\s*\{/, \"return {\n      base: './',\");
+              fs.writeFileSync(filePath, content);
+              console.log('Successfully fixed base path in ' + filePath);
             }
           }
           "
-          # পরিবর্তনগুলো Main Branch-এ সেভ করা
+
+      - name: Save Changes to Main Branch
+        run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "chore: auto-fix vite config and unzip files" || echo "No changes to commit"
-          git push origin main
+          # শুধুমাত্র পরিবর্তন থাকলেই কমিক করবে
+          git diff --quiet && git diff --staged --quiet || (git commit -m "fix: added base path for github pages" && git push origin main)
 
       - name: Install and Build
         run: |
@@ -65,4 +67,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
           publish_branch: gh-pages
-          force_orphan: true # এটি দিলে পুরনো ফাইল মুছে নতুন করে ব্রাঞ্চ তৈরি হবে, যা আপনার সমস্যার সমাধান করবে
+          force_orphan: true
