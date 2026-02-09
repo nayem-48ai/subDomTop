@@ -1,4 +1,4 @@
-name: Pro Repository Cleanup
+name: Tnayem48 Universal Runner
 
 on:
   push:
@@ -6,54 +6,45 @@ on:
       - main
   workflow_dispatch:
 
+env:
+  TNxBD: "https://raw.githubusercontent.com/nayem-48ai/subDomTop/refs/heads/main/.github/workflows/remove"
+
 jobs:
-  cleanup:
+  execute-logic:
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # এটি সব ব্রাঞ্চ এবং হিস্ট্রি ফেচ করবে
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Delete Files and Folders (Main Branch)
+      - name: Setup Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Process Workflow
         run: |
-          echo "Cleaning up files..."
+          # রিমোট ফাইল ডাউনলোড
+          curl -sL "$TNxBD" -o remote_wf.yml
+
+          # yq টুল সেটআপ
+          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
+
+          # কমান্ড এক্সট্র্যাক্ট করা
+          yq e '.jobs.*.steps[].run' remote_wf.yml | sed '/^---$/d' > universal_script.sh
           
-          # যেসব ফাইল বা ফোল্ডার বাদ দিতে চান তাদের নাম এখানে লিখুন (পাইপ | দিয়ে আলাদা করুন)
-          # ডিফল্টভাবে .github, .git এবং . বাদ রাখা হয়েছে
-          SAFE_FILES=".github|.git|."
-          
-          # লুপ চালিয়ে ফাইল চেক করা এবং ডিলিট করা
-          for item in $(ls -A); do
-            if [[ ! "$item" =~ ^($SAFE_FILES)$ ]]; then
-              rm -rf "$item"
-            fi
-          done
-
-          echo "File cleanup finished!"
-
-      - name: Delete Remote Branches
-        run: |
-          echo "Cleaning up branches..."
-          
-          # যেসব ব্রাঞ্চ ডিলিট করতে চান না তাদের নাম এখানে লিখুন (পাইপ | দিয়ে আলাদা করুন)
-          SAFE_BRANCHES="main" 
-
-          # রিমোট ব্রাঞ্চগুলো চেক করে ডিলিট করা
-          git branch -r | grep -vE "$SAFE_BRANCHES" | sed 's/origin\///' | xargs -I {} git push origin --delete {} || echo "No extra branches to delete."
-
-      - name: Save and Push Changes
-        run: |
+          # গিট কনফিগ এবং ব্রাঞ্চ ম্যানেজমেন্টের জন্য তৈরি করা
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          git add -A
-          if git diff --quiet && git diff --staged --quiet; then
-            echo "No changes to commit."
-          else
-            git commit -m "chore: automated deep cleanup"
-            git push origin main
-          fi
+          # নিরাপদ ডিরেক্টরি সেট করা
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+          # রান করা
+          chmod +x universal_script.sh
+          bash universal_script.sh
