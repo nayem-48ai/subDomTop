@@ -1,4 +1,4 @@
-name: Unzip, Auto-Fix Config, Build and Deploy
+name: Unzip, Fix Config, and Deploy
 
 on:
   push:
@@ -29,26 +29,29 @@ jobs:
             rm "$ZIP_FILE"
           fi
 
-      - name: Auto-Fix Vite Config (Base Path)
+      - name: Auto-Fix Vite Config (Safe Method)
         run: |
-          CONFIG_FILE=$(ls vite.config.* | head -n 1)
-          if [ -f "$CONFIG_FILE" ]; then
-            if ! grep -q "base:" "$CONFIG_FILE"; then
-              echo "Base path missing. Adding base: './' to $CONFIG_FILE"
-              # defineConfig এর ঠিক পরে base: './' ইনসার্ট করার চেষ্টা করবে
-              sed -i "s/defineConfig({/defineConfig({\n      base: '.\/',/" "$CONFIG_FILE"
-            else
-              echo "Base path already exists in $CONFIG_FILE"
-            fi
-          fi
+          node -e "
+          const fs = require('fs');
+          const files = fs.readdirSync('.').filter(f => f.startsWith('vite.config.'));
+          if (files.length > 0) {
+            let content = fs.readFileSync(files[0], 'utf8');
+            if (!content.includes('base:')) {
+              // defineConfig এর ভেতরে base পাথ ঢুকিয়ে দিচ্ছে
+              content = content.replace(/defineConfig\(\{/, \"defineConfig({\n  base: './',\");
+              fs.writeFileSync(files[0], content);
+              console.log('Fixed base path in ' + files[0]);
+            } else {
+              console.log('Base path already exists.');
+            }
+          }
+          "
 
       - name: Install and Build
         run: |
-          # .gitignore থেকে dist বাদ দেওয়া যেন গিট এটি রিড করতে পারে
           sed -i '/dist/d' .gitignore || true
           npm install
           npm run build
-          # Jekyll বন্ধ করার জন্য dist এর ভেতর .nojekyll ফাইল তৈরি
           touch dist/.nojekyll
 
       - name: Deploy to GitHub Pages
@@ -56,5 +59,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
-          publish_branch: gh-pages # ব্রাঞ্চ থাকলে আপডেট করবে, না থাকলে তৈরি করবে
-          force_orphan: false # এটি ট্রু থাকলে হিস্ট্রি ডিলিট হয়, ফলস থাকলে আপডেট হয়
+          publish_branch: gh-pages
+          force_orphan: false # ব্রাঞ্চ ডিলিট না করে আপডেট করবে
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
