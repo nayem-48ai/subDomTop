@@ -31,17 +31,26 @@ jobs:
             rm "$ZIP_FILE"
           fi
 
-      - name: Force Fix Vite Config
+      - name: Fix Vite Config (Base & AllowedHosts)
         run: |
           node -e "
           const fs = require('fs');
-          const filePath = fs.readdirSync('.').find(f => f.startsWith('vite.config.'));
-          if (filePath) {
-            let content = fs.readFileSync(filePath, 'utf8');
+          const file = fs.readdirSync('.').find(f => f.startsWith('vite.config.'));
+          if (file) {
+            let content = fs.readFileSync(file, 'utf8');
+            
+            // Base path ঠিক করা
             if (!content.includes('base:')) {
               content = content.replace(/return\s*\{/, \"return {\n      base: './',\");
-              fs.writeFileSync(filePath, content);
             }
+            
+            // Allowed Hosts ঠিক করা যাতে লোকালটানেল ব্লক না করে
+            if (!content.includes('allowedHosts')) {
+              content = content.replace(/server\s*:\s*\{/, \"server: {\n        allowedHosts: 'all',\");
+            }
+            
+            fs.writeFileSync(file, content);
+            console.log('Vite config updated successfully.');
           }
           "
 
@@ -50,41 +59,38 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git diff --quiet && git diff --staged --quiet || (git commit -m "fix: sync zip changes" && git push origin main)
+          git diff --quiet && git diff --staged --quiet || (git commit -m "fix: sync changes for preview" && git push origin main)
 
       - name: Install Dependencies
         run: npm install
 
       - name: Live Dev Preview (10 Minutes)
         run: |
-          # পোর্ট ডিটেকশন
+          # পোর্ট খুঁজে বের করা
           PORT=$(node -e "
             const fs = require('fs');
             try {
               const file = fs.readdirSync('.').find(f => f.startsWith('vite.config.'));
-              if (file) {
-                const content = fs.readFileSync(file, 'utf8');
-                const match = content.match(/port\s*:\s*(\d+)/);
-                if (match) { console.log(match[1]); process.exit(0); }
-              }
-            } catch (e) {}
-            console.log(3000);
+              const content = fs.readFileSync(file, 'utf8');
+              const match = content.match(/port\s*:\s*(\d+)/);
+              console.log(match ? match[1] : 3000);
+            } catch (e) { console.log(3000); }
           ")
 
-          # রানারের আইপি বের করা (যদি পাসওয়ার্ড বা আইপি চায় তার জন্য)
           RUNNER_IP=$(curl -s https://ifconfig.me)
 
           echo "------------------------------------------------------------"
-          echo "🚀 PREVIEW INFORMATION"
+          echo "🚀 PREVIEW INFO"
           echo "Your Password/Endpoint IP: $RUNNER_IP"
           echo "------------------------------------------------------------"
 
           npm install -g localtunnel
+          # Vite সার্ভার রান করা
           npm run dev -- --host & 
           
           sleep 15
           
-          # ১০ মিনিট প্রিভিউ সেশন
+          # ১০ মিনিট সময় পাবেন প্রিভিউ দেখার জন্য
           timeout 10m lt --port $PORT || true
 
       - name: Final Build and Deploy
