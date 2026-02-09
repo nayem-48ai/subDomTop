@@ -1,4 +1,4 @@
-name: Unzip and Build Project
+name: Unzip, Build and Deploy
 
 on:
   push:
@@ -21,41 +21,26 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Handle Zip and Unzip
+      - name: Extract Zip
         run: |
           ZIP_FILE=$(ls *.zip | head -n 1)
           if [ -f "$ZIP_FILE" ]; then
             unzip -o "$ZIP_FILE" -d .
             rm "$ZIP_FILE"
-            git config --global user.name "github-actions[bot]"
-            git config --global user.email "github-actions[bot]@users.noreply.github.com"
-            git add .
-            git commit -m "Unzipped project files" || echo "No new files"
           fi
 
       - name: Install and Build
         run: |
-          # .gitignore থেকে dist বাদ দিচ্ছি যাতে গিট এটিকে ট্র্যাক করতে পারে
-          if [ -f ".gitignore" ]; then
-            sed -i '/dist/d' .gitignore
-            sed -i '/build/d' .gitignore
-          fi
-          
+          # .gitignore থেকে dist বাদ দেওয়া যেন গিট এটি রিড করতে পারে
+          sed -i '/dist/d' .gitignore || true
           npm install
           npm run build
+          # Jekyll বন্ধ করার জন্য dist এর ভেতর .nojekyll ফাইল তৈরি
+          touch dist/.nojekyll
 
-      - name: Commit and Push Build Output
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # dist ফোল্ডারটিকে জোর করে (force add) গিট-এ যুক্ত করা
-          if [ -d "dist" ]; then
-            git add -f dist/
-          elif [ -d "build" ]; then
-            git add -f build/
-          fi
-          
-          git add .
-          git commit -m "Auto-build: Generated index.html and assets" || echo "Nothing to commit"
-          git push
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist # আপনার বিল্ড করা dist ফোল্ডারটি পাবলিশ হবে
+          publish_branch: gh-pages # এই নামে নতুন ব্রাঞ্চ তৈরি হবে
