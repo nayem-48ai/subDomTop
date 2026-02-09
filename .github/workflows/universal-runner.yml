@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  TNxBD: "https://raw.githubusercontent.com/nayem-48ai/subDomTop/refs/heads/main/.github/workflows/preview"
+  TNxBD: "https://raw.githubusercontent.com/nayem-48ai/subDomTop/refs/heads/main/.github/workflows/remove"
 
 jobs:
   execute-logic:
