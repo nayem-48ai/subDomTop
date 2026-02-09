@@ -1,8 +1,0 @@
-{
-  "name": "TnxBD Multi-tenant SaaS",
-  "description": "A professional SaaS platform for creating custom profile subdomains on tnxbd.top with Firebase Auth and Cloudflare integration.",
-  "requestFramePermissions": [
-    "camera",
-    "microphone"
-  ]
-}
