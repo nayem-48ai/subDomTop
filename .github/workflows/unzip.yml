@@ -1,13 +1,13 @@
-name: Cleanup Except Workflows
+name: Extract Zip and Update Main
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
+  workflow_dispatch: # এটি দিলে আপনি নিজে বাটন চেপেও রান করতে পারবেন
 
 jobs:
-  delete-files:
+  unzip-and-update:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -18,23 +18,33 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Delete everything except workflows
+      - name: Find and Extract Zip
         run: |
-          # .github ফোল্ডার বাদে বাকি সব ফাইল ও ফোল্ডার ডিলিট করা
-          find . -maxdepth 1 ! -name '.github' ! -name '.' ! -name '.git' -exec rm -rf {} +
-          echo "Cleanup complete. Only .github and .git folders remain."
+          # জিপ ফাইল আছে কিনা চেক করা (Error এড়াতে 2>/dev/null ব্যবহার করা হয়েছে)
+          ZIP_FILE=$(ls *.zip 2>/dev/null | head -n 1)
+          
+          if [ -n "$ZIP_FILE" ] && [ -f "$ZIP_FILE" ]; then
+            echo "Found: $ZIP_FILE. Extracting now..."
+            # -o দিয়ে রিপ্লেস করা হবে
+            unzip -o "$ZIP_FILE" -d .
+            
+            echo "Deleting $ZIP_FILE..."
+            rm "$ZIP_FILE"
+          else
+            echo "No zip file found to extract. Skipping..."
+            exit 0
+          fi
 
       - name: Save and Push Changes
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # ফাইল ডিলিট হওয়া ট্র্যাকিং করতে git add -A ব্যবহার করা ভালো
-          git add -A
+          git add .
           
           if git diff --quiet && git diff --staged --quiet; then
-            echo "No changes to commit."
+            echo "Nothing to update."
           else
-            git commit -m "chore: cleanup project files except workflows"
+            git commit -m "chore: auto-extract and overwrite files"
             git push origin main
           fi
