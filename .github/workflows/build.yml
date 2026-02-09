@@ -41,7 +41,6 @@ jobs:
             if (!content.includes('base:')) {
               content = content.replace(/return\s*\{/, \"return {\n      base: './',\");
               fs.writeFileSync(filePath, content);
-              console.log('Fixed base path in ' + filePath);
             }
           }
           "
@@ -56,9 +55,9 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Live Dev Preview (No Password)
+      - name: Live Dev Preview (10 Minutes)
         run: |
-          # উন্নত পোর্ট সার্চ লজিক
+          # পোর্ট ডিটেকশন
           PORT=$(node -e "
             const fs = require('fs');
             try {
@@ -71,22 +70,22 @@ jobs:
             } catch (e) {}
             console.log(3000);
           ")
-          
-          echo "Using Port: $PORT"
-          
-          # Dev সার্ভার ব্যাকগ্রাউন্ডে রান করা
+
+          # রানারের আইপি বের করা (যদি পাসওয়ার্ড বা আইপি চায় তার জন্য)
+          RUNNER_IP=$(curl -s https://ifconfig.me)
+
+          echo "------------------------------------------------------------"
+          echo "🚀 PREVIEW INFORMATION"
+          echo "Your Password/Endpoint IP: $RUNNER_IP"
+          echo "------------------------------------------------------------"
+
+          npm install -g localtunnel
           npm run dev -- --host & 
           
-          # সার্ভার চালু হওয়ার জন্য সময়
-          sleep 10
+          sleep 15
           
-          echo "------------------------------------------------------------"
-          echo "লিঙ্কটি জেনারেট হচ্ছে, নিচের 'Forwarding' লিঙ্কটিতে ক্লিক করুন:"
-          echo "------------------------------------------------------------"
-          
-          # Serveo ব্যবহার করে টানেলিং (পাসওয়ার্ড লাগে না)
-          # এটি ১০ মিনিট চালু থাকবে
-          timeout 10m ssh -o StrictHostKeyChecking=no -R 80:localhost:$PORT serveo.net || true
+          # ১০ মিনিট প্রিভিউ সেশন
+          timeout 10m lt --port $PORT || true
 
       - name: Final Build and Deploy
         run: |
