@@ -1,14 +1,22 @@
-name: Dev Preview (Auto Port Detection)
+name: Final Fix - Preview and Deploy
 
 on:
-  workflow_dispatch: # ম্যানুয়ালি রান করার জন্য
+  push:
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
-  preview:
+  build-and-preview:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -23,31 +31,76 @@ jobs:
             rm "$ZIP_FILE"
           fi
 
+      - name: Force Fix Vite Config
+        run: |
+          node -e "
+          const fs = require('fs');
+          const filePath = fs.readdirSync('.').find(f => f.startsWith('vite.config.'));
+          if (filePath) {
+            let content = fs.readFileSync(filePath, 'utf8');
+            if (!content.includes('base:')) {
+              content = content.replace(/return\s*\{/, \"return {\n      base: './',\");
+              fs.writeFileSync(filePath, content);
+              console.log('Fixed base path in ' + filePath);
+            }
+          }
+          "
+
+      - name: Save Changes to Main Branch
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git diff --quiet && git diff --staged --quiet || (git commit -m "fix: sync zip changes" && git push origin main)
+
       - name: Install Dependencies
         run: npm install
 
-      - name: Detect Port and Start Preview
+      - name: Live Dev Preview (5 Minutes)
         run: |
-          # Node.js দিয়ে vite config থেকে পোর্ট খুঁজে বের করা
+          # উন্নত পোর্ট সার্চ লজিক
           PORT=$(node -e "
             const fs = require('fs');
-            const content = fs.readFileSync('vite.config.js', 'utf8');
-            const match = content.match(/port:\s*(\d+)/);
-            console.log(match ? match[1] : 5173);
+            try {
+              const file = fs.readdirSync('.').find(f => f.startsWith('vite.config.'));
+              if (file) {
+                const content = fs.readFileSync(file, 'utf8');
+                // port: 3000 বা port:3000 ফরম্যাট খুঁজবে
+                const match = content.match(/port\s*:\s*(\d+)/);
+                if (match) {
+                  console.log(match[1]);
+                  process.exit(0);
+                }
+              }
+            } catch (e) {}
+            // কিছু না পেলে ডিফল্ট ৩০০০
+            console.log(3000);
           ")
-          echo "Detected Port: $PORT"
-
-          # লকাল টানেল ইনস্টল
+          
+          echo "Using Port: $PORT"
           npm install -g localtunnel
           
-          # Dev সার্ভার ব্যাকগ্রাউন্ডে রান করা হচ্ছে
+          # Dev সার্ভার ব্যাকগ্রাউন্ডে রান করা
           npm run dev -- --host & 
           
-          # সার্ভার পুরোপুরি চালু হওয়ার জন্য কিছুটা সময় দেয়া
+          # সার্ভার চালু হওয়ার জন্য একটু বেশি সময় দেয়া
           sleep 15
           
-          # টানেল চালু করা এবং লিঙ্ক দেখানো
-          echo "------------------------------------------"
-          echo "YOUR PUBLIC PREVIEW LINK BELOW:"
-          lt --port $PORT
-          echo "------------------------------------------"
+          echo "------------------------------------------------------------"
+          echo "গিটহাব অ্যাকশন লগের নিচে এই লিঙ্কে ক্লিক করুন প্রিভিউ দেখতে:"
+          # ১০ মিনিট প্রিভিউ সেশন চালু থাকবে
+          timeout 10m lt --port $PORT || true
+          echo "------------------------------------------------------------"
+
+      - name: Final Build and Deploy
+        run: |
+          npm run build
+          touch dist/.nojekyll
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          publish_branch: gh-pages
+          force_orphan: true
