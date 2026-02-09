@@ -1,4 +1,4 @@
-name: Final Fix - Preview and Deploy
+name: Final Fix - Preview and Deploy (No Password)
 
 on:
   push:
@@ -38,23 +38,16 @@ jobs:
           const file = fs.readdirSync('.').find(f => f.startsWith('vite.config.'));
           if (file) {
             let content = fs.readFileSync(file, 'utf8');
-            
-            // ১. বেস পাথ সেট করা
             if (!content.includes('base:')) {
               content = content.replace(/return\s*\{/, \"return {\n      base: './',\");
             }
-            
-            // ২. সম্পূর্ণ সার্ভার কনফিগারেশন ইনজেক্ট করা (পুরানো থাকলে রিপ্লেস করবে)
-            // এটি নিশ্চিত করবে যে Vite কোনোভাবেই হোস্ট ব্লক করবে না
             const serverConfig = \"server: { host: '0.0.0.0', port: 3000, allowedHosts: true },\";
             if (content.includes('server:')) {
               content = content.replace(/server\s*:\s*\{[\s\S]*?\},/, serverConfig);
             } else {
               content = content.replace(/return\s*\{/, \"return {\n      \" + serverConfig);
             }
-            
             fs.writeFileSync(file, content);
-            console.log('Vite config successfully patched for tunneling.');
           }
           "
 
@@ -63,26 +56,28 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git diff --quiet && git diff --staged --quiet || (git commit -m "fix: prepare for preview" && git push origin main)
+          git diff --quiet && git diff --staged --quiet || (git commit -m "fix: prepare for cloudflare preview" && git push origin main)
 
       - name: Install Dependencies
         run: npm install
 
-      - name: Live Dev Preview (10 Minutes)
+      - name: Live Dev Preview (Cloudflare - No Password)
         run: |
-          RUNNER_IP=$(curl -s https://ifconfig.me)
+          # Cloudflared ইনস্টল করা
+          curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared.deb
+          
           echo "------------------------------------------------------------"
-          echo "🌐 PREVIEW ACCESS INFO"
-          echo "Endpoint IP / Password: $RUNNER_IP"
+          echo "🌐 CLOUDFLARE PREVIEW LINK BELOW (NO PASSWORD NEEDED)"
           echo "------------------------------------------------------------"
 
-          npm install -g localtunnel
-          # ৩০০০ পোর্ট ফিক্সড করে দিয়েছি যাতে কোনো কনফিউশন না থাকে
+          # Vite সার্ভার রান করা
           npm run dev -- --host 0.0.0.0 --port 3000 & 
           
           sleep 15
           
-          timeout 10m lt --port 3000 || true
+          # ক্লাউডফ্লেয়ার টানেল চালু করা (১০ মিনিট)
+          timeout 10m cloudflared tunnel --url http://localhost:3000 || true
 
       - name: Final Build and Deploy
         run: |
